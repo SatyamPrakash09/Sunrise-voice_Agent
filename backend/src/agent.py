@@ -1,3 +1,6 @@
+import os
+os.environ["LIVEKIT_AGENTS_PRELOAD_LOCAL_INFERENCE"] = "0"
+
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from database import init_db
@@ -134,11 +137,14 @@ class SalonAssistant(Agent):
 
 
 async def entrypoint(ctx: JobContext):
-
-    await init_db()
-
+    # Connect room audio immediately so user receives greeting right away
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
+    # Initialize DB safely without blocking audio
+    try:
+        await init_db()
+    except Exception as e:
+        print(f"Database initialization warning: {e}")
 
     session = AgentSession(
         # Deepgram Nova-3 provides superior accuracy for Indian English and global accents
@@ -188,7 +194,7 @@ if __name__ == "__main__":
             entrypoint_fnc=entrypoint,
             job_executor_type=JobExecutorType.THREAD,
             load_threshold=float("inf"),
-            num_idle_processes=0,
+            num_idle_processes=1,
             host="127.0.0.1",
         )
     )

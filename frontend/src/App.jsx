@@ -99,6 +99,7 @@ export default function App() {
         })
 
         await room.connect(data.url, data.token)
+        await room.startAudio()
         await room.localParticipant.setMicrophoneEnabled(true)
 
         setActive(true)
