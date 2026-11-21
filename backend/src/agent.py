@@ -10,6 +10,7 @@ from livekit.plugins import silero
 from controllers import (
     manage_appointment_db,
     check_availability_db,
+    check_appointment_db,
     get_faq_from_db,
     get_service_from_db,
     get_stylist_from_db,
@@ -20,62 +21,75 @@ from controllers import (
     description=(
         "Check if a stylist is available on a specific date or time slot, or see all booked slots. "
         "Use this BEFORE booking whenever the user asks about availability or mentions a time. "
-        "stylist: stylist name (Anita Rao, Rahul Shetty, Kavya Nair). "
+        "stylist: stylist name (Anita Rao, Rahul Shetty, Kavya Nair) or 'any' if not specified. "
         "slot_time: ISO 8601 string, e.g. '2026-11-23T11:00:00' or date '2026-11-23'."
     )
 )
-async def check_availability(stylist: str, slot_time: str):
+async def check_availability(stylist: str = "any", slot_time: str = ""):
     return await check_availability_db(stylist, slot_time)
 
 
 @function_tool(
     description=(
+        "Check, lookup, or view existing booked appointments for a customer. "
+        "Use this whenever the caller asks to check, see, or find their booking. "
+        "customer_name: full or partial name of the customer."
+    )
+)
+async def check_appointment(customer_name: str):
+    return await check_appointment_db(customer_name)
+
+
+@function_tool(
+    description=(
         "Book or cancel an appointment. "
-        "Call this ONLY after collecting ALL required fields from the user and user explicitly agrees: "
-        "action ('book' or 'cancel'), customer_name (full real name of customer), service (exact service name), "
-        "stylist (exact stylist name), slot_time (ISO 8601 format: YYYY-MM-DDTHH:MM:SS, "
-        "e.g. '2026-11-23T11:00:00'). NEVER invent or use dummy names like 'A, b, c, d' or 'Jane'. "
+        "Call this ONLY after collecting required fields and customer explicitly confirms. "
+        "action: 'book' or 'cancel'. "
+        "customer_name: full real name of customer. "
+        "service: service name (e.g. 'Haircut (women)', 'Hair spa'). "
+        "stylist: stylist name (Anita Rao, Rahul Shetty, Kavya Nair). "
+        "slot_time: ISO 8601 format: YYYY-MM-DDTHH:MM:SS (e.g. '2026-11-23T11:00:00'). "
         "Call this tool ONLY ONCE per booking."
     )
 )
 async def manage_appointment(
     action: str,
     customer_name: str,
-    service: str,
-    stylist: str,
-    slot_time: str,
+    service: str = "",
+    stylist: str = "",
+    slot_time: str = "",
 ):
     return await manage_appointment_db(action, customer_name, service, stylist, slot_time)
 
 
 @function_tool(
     description=(
-        "Get FAQ about the Salon. Use for questions about payment, parking, "
-        "walk-ins, cancellation policy, opening hours, and general policies. "
-        "Pass the topic keyword e.g. 'payment', 'parking', 'policies'."
+        "Get FAQ about the Salon. Use for questions about payment, parking, location, "
+        "walk-ins, cancellation policy, opening hours, discounts, and general policies. "
+        "Pass topic keyword e.g. 'payment', 'parking', 'cancellation', 'hours', 'location'."
     )
 )
-async def get_faq(topic: str):
+async def get_faq(topic: str = "general"):
     return await get_faq_from_db(topic)
 
 
 @function_tool(
     description=(
-        "Get details and pricing for a specific service. "
-        "Use when the user asks about a service cost or what services are available."
+        "Get details and pricing for services, or list all offered services. "
+        "service_name: specific service name (e.g. 'haircut', 'facial') or 'all' to list all services."
     )
 )
-async def get_service(service_name: str):
+async def get_service(service_name: str = "all"):
     return await get_service_from_db(service_name)
 
 
 @function_tool(
     description=(
-        "Get a stylist's specialties, working days, and working hours. "
-        "Use when the user asks about a stylist or wants to know who does what."
+        "Get a stylist's specialties, working days, and working hours, or list all stylists. "
+        "stylist_name: stylist name (Anita Rao, Rahul Shetty, Kavya Nair) or 'all' to list all."
     )
 )
-async def get_stylist(stylist_name: str):
+async def get_stylist(stylist_name: str = "all"):
     return await get_stylist_from_db(stylist_name)
 
 
@@ -109,11 +123,12 @@ class SalonAssistant(Agent):
             f"- You are serving callers in Bengaluru, India. Customers speak with Indian accents and may use Indian English terms (e.g., 'Rs 600', 'need a clean-up', 'is parking there', 'today evening', 'slot').\n"
             f"- Pay close attention to Indian names (Anita Rao, Rahul Shetty, Kavya Nair) and services. If the STT transcript has minor phonetic variations, match them intelligently to known staff and services.\n\n"
 
-            f"TOOL USAGE & BOOKING RULES:\n"
-            f"- Use check_availability FIRST whenever the user asks about a date or time slot, to verify if the stylist is free.\n"
-            f"- Use get_service when the user asks about a service or price.\n"
-            f"- Use get_stylist when the user asks about a stylist's schedule or specialties.\n"
-            f"- Use get_faq for questions about payment, parking, walk-ins, or policies.\n\n"
+            f"TOOL USAGE RULES:\n"
+            f"- Use check_appointment when the caller asks to check, verify, view, or find their existing booking or appointment.\n"
+            f"- Use check_availability FIRST whenever the user asks about a date or time slot, to verify if a stylist is free.\n"
+            f"- Use get_service when the user asks about a service or price, or asks what services we offer.\n"
+            f"- Use get_stylist when the user asks about stylists, schedules, specialties, or who works here.\n"
+            f"- Use get_faq for questions about payment, parking, location, walk-ins, cancellation, timings, or policies.\n\n"
 
             f"BOOKING CONFIRMATION & DUPLICATE PREVENTION:\n"
             f"- To book an appointment, collect all 4 items: Customer Full Name, Service, Stylist, Date/Time (30-min slots).\n"
@@ -129,7 +144,14 @@ class SalonAssistant(Agent):
 
         super().__init__(
             instructions=instructions,
-            tools=[check_availability, manage_appointment, get_faq, get_service, get_stylist],
+            tools=[
+                check_availability,
+                check_appointment,
+                manage_appointment,
+                get_faq,
+                get_service,
+                get_stylist,
+            ],
         )
 
 
