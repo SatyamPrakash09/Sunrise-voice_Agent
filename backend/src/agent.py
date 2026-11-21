@@ -4,7 +4,6 @@ from database import init_db
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, room_io, function_tool
 from livekit.agents import AgentSession, Agent
 from livekit.plugins import silero, noise_cancellation
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from controllers import (
     manage_appointment_db,
     check_availability_db,
@@ -147,7 +146,6 @@ async def entrypoint(ctx: JobContext):
         llm="openai/gpt-4.1-mini",
         tts="cartesia/sonic-3",
         vad=silero.VAD.load(),
-        turn_detection=MultilingualModel(),
         stt_context_options={
             "keyterms": [
                 "Sunrise Salon",
@@ -185,4 +183,4 @@ async def entrypoint(ctx: JobContext):
 
 
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, num_idle_processes=0))

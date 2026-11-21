@@ -20,7 +20,7 @@ LIVEKIT_URL =settings.LIVEKIT_URL
 LIVEKIT_API_KEY = settings.LIVEKIT_API_KEY
 LIVEKIT_API_SECRET = settings.LIVEKIT_API_SECRET
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {"message": "Hello World"}
 
