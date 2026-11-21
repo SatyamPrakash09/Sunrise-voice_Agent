@@ -4,9 +4,9 @@ os.environ["LIVEKIT_AGENTS_PRELOAD_LOCAL_INFERENCE"] = "0"
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from database import init_db
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, JobExecutorType, cli, room_io, function_tool
+from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, JobExecutorType, cli, function_tool
 from livekit.agents import AgentSession, Agent
-from livekit.plugins import silero, noise_cancellation
+from livekit.plugins import silero
 from controllers import (
     manage_appointment_db,
     check_availability_db,
@@ -151,7 +151,7 @@ async def entrypoint(ctx: JobContext):
         stt="deepgram/nova-3:en",
         llm="openai/gpt-4.1-mini",
         tts="cartesia/sonic-3",
-        vad=silero.VAD.load(),
+        vad=None,
         stt_context_options={
             "keyterms": [
                 "Sunrise Salon",
@@ -174,11 +174,6 @@ async def entrypoint(ctx: JobContext):
     await session.start(
         agent=assistant,
         room=ctx.room,
-        room_options=room_io.RoomOptions(
-            audio_input=room_io.AudioInputOptions(
-                noise_cancellation=noise_cancellation.BVCTelephony(),  # Background voice cancellation
-            ),
-        ),
     )
 
     await session.say(
