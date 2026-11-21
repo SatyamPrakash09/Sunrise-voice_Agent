@@ -1,2 +1,2 @@
-web: uv run uvicorn src.app:app --host 0.0.0.0 --port 3000
-worker: uv run src/agent.py start
+web: uv run uvicorn src.app:app --host 0.0.0.0 --port $PORT
+worker: uv run python src/agent.py start
