@@ -19,8 +19,10 @@ elif DATABASE_URL.startswith("postgresql://"):
       "postgresql://", "postgresql+asyncpg://", 1
   )
 
-# Create the async engine
-engine = create_async_engine(DATABASE_URL, echo=False)
+from sqlalchemy.pool import NullPool
+
+# Create the async engine with NullPool so each job/thread opens and closes its own connection cleanly on its event loop
+engine = create_async_engine(DATABASE_URL, echo=False, poolclass=NullPool)
 
 # Create the async session maker
 AsyncSessionLocal = async_sessionmaker(

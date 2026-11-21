@@ -173,7 +173,7 @@ async def entrypoint(ctx: JobContext):
         stt="deepgram/nova-3:en",
         llm="openai/gpt-4.1-mini",
         tts="cartesia/sonic-3",
-        vad=None,
+        vad=silero.VAD.load(),
         stt_context_options={
             "keyterms": [
                 "Sunrise Salon",
