@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from database import init_db
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, room_io, function_tool
+from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, JobExecutorType, cli, room_io, function_tool
 from livekit.agents import AgentSession, Agent
 from livekit.plugins import silero, noise_cancellation
 from controllers import (
@@ -183,4 +183,10 @@ async def entrypoint(ctx: JobContext):
 
 
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, num_idle_processes=0))
+    cli.run_app(
+        WorkerOptions(
+            entrypoint_fnc=entrypoint,
+            job_executor_type=JobExecutorType.THREAD,
+            load_threshold=float("inf"),
+        )
+    )
