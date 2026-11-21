@@ -52,6 +52,12 @@ function AudioVisualizer() {
   )
 }
 
+const BACKEND_URL = (
+  import.meta.env.VITE_BACKEND_URL ||
+  import.meta.env.BACKEND_URL ||
+  ''
+).replace(/\/+$/, '')
+
 /* ── Main App ──────────────────────────────────────────────── */
 export default function App() {
   const [active, setActive] = useState(false)
@@ -70,7 +76,10 @@ export default function App() {
     if (!active) {
       setStatus('connecting')
       try {
-        const res = await fetch('/token')
+        const res = await fetch(`${BACKEND_URL}/token`)
+        if (!res.ok) {
+          throw new Error(`Failed to fetch token: ${res.statusText}`)
+        }
         const data = await res.json()
 
         const room = new Room()

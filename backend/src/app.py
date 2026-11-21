@@ -1,11 +1,20 @@
 import os
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from livekit import api
 from src.config import get_settings
 settings = get_settings()
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 LIVEKIT_URL =settings.LIVEKIT_URL
 LIVEKIT_API_KEY = settings.LIVEKIT_API_KEY
