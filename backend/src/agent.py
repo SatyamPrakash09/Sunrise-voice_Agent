@@ -188,5 +188,7 @@ if __name__ == "__main__":
             entrypoint_fnc=entrypoint,
             job_executor_type=JobExecutorType.THREAD,
             load_threshold=float("inf"),
+            num_idle_processes=0,
+            host="127.0.0.1",
         )
     )
