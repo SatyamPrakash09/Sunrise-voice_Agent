@@ -1,26 +1,28 @@
 import os
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+
 from livekit import api
-from dotenv import load_dotenv
-load_dotenv()
+from src.config import get_settings
+settings = get_settings()
 
 app = FastAPI()
 
-LIVEKIT_URL = os.getenv("LIVEKIT_URL")
-LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
-LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
+LIVEKIT_URL =settings.LIVEKIT_URL
+LIVEKIT_API_KEY = settings.LIVEKIT_API_KEY
+LIVEKIT_API_SECRET = settings.LIVEKIT_API_SECRET
 
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
 
 @app.get("/token")
-async def get_token():
+async def get_token(room: str | None = None):
     if not LIVEKIT_URL or not LIVEKIT_API_KEY or not LIVEKIT_API_SECRET:
         raise HTTPException(status_code=500, detail="LiveKit credentials missing")
 
-    room_name = "sunrise-salon-room"
+    # Generate a unique room name for each call session so LiveKit Cloud
+    # dispatches a new agent job every time a user connects.
+    room_name = room or f"sunrise-salon-{os.urandom(4).hex()}"
     participant_name = f"customer-{os.urandom(2).hex()}"
 
     token = (
@@ -31,4 +33,4 @@ async def get_token():
         .to_jwt()
     )
 
-    return {"url": LIVEKIT_URL, "token": token}
+    return {"url": LIVEKIT_URL, "token": token, "room": room_name}

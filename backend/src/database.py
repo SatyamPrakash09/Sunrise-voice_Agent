@@ -1,12 +1,32 @@
 import os
-from sqlalchemy import Column, DateTime, Integer, String, Text, create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
 from config import get_settings
-settings = get_settings()
+from sqlalchemy import Column, DateTime, Integer, String, Text, UniqueConstraint, inspect
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import declarative_base
 
+settings = get_settings()
 DATABASE_URL = settings.DATABASE_URL
-engine = create_engine(DATABASE_URL, echo=False)
-SessionLocal = sessionmaker(bind=engine)
+
+
+if DATABASE_URL.startswith("postgres://"):
+  DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
+  DATABASE_URL = DATABASE_URL.replace(
+      "postgresql://", "postgresql+asyncpg://", 1
+  )
+
+# Create the async engine
+engine = create_async_engine(DATABASE_URL, echo=False)
+
+# Create the async session maker
+AsyncSessionLocal = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
+
 Base = declarative_base()
 
 
@@ -37,16 +57,29 @@ class FAQ(Base):
 
 class Appointment(Base):
   __tablename__ = "appointments"
+  __table_args__ = (
+      # Prevent double-booking: a stylist can only have one appointment per slot.
+      # Using a composite constraint instead of unique=True on slot_time alone,
+      # which would (incorrectly) prevent two different stylists from being
+      # booked at the same wall-clock time.
+      UniqueConstraint("stylist", "slot_time", name="uq_stylist_slot"),
+  )
   id = Column(Integer, primary_key=True, autoincrement=True)
   customer_name = Column(String, nullable=False)
   service = Column(String, nullable=False)
   stylist = Column(String, nullable=False)
-  slot_time = Column(DateTime, nullable=False, unique=True)  # Prevents double booking
+  slot_time = Column(DateTime, nullable=False)
+  status = Column(String, nullable=False, default="Confirmed")
 
 
-def seed_data(db_session):
-  if db_session.query(Stylist).count() > 0:
-    return  # Already seeded
+
+async def seed_data(db_session: AsyncSession):
+  from sqlalchemy import select
+
+  # Check if stylists already exist
+  result = await db_session.execute(select(Stylist))
+  if result.scalars().first():
+    return  "Already Done"
 
   # Seed Stylists
   stylists = [
@@ -134,28 +167,35 @@ def seed_data(db_session):
           content=(
               "Free cancellation up to 2 hours before. If more than 15 minutes"
               " late, the booking may be moved to the next free slot. No"
-              " discounts right now."
-              "No membership or package info"
-              "Free cancellation up to 2 hours before."
-              "30 minute slots, one slot per booking. Closed Sundays. Timezone Asia/Kolkata (IST)."
+              " discounts right now. No membership or package info. Free"
+              " cancellation up to 2 hours before. 30 minute slots, one slot"
+              " per booking. Closed Sundays. Timezone Asia/Kolkata (IST)."
           ),
       ),
   ]
 
   db_session.add_all(stylists + services + faqs)
-  db_session.commit()
+  await db_session.commit()
 
 
-from sqlalchemy import inspect
+_db_initialized = False
 
-def init_db():
-    Base.metadata.create_all(bind=engine)
-    inspector = inspect(engine)
-    print("Tables created:", inspector.get_table_names())
 
-    session = SessionLocal()
+async def init_db():
+  global _db_initialized
+  if _db_initialized:
+    return
+
+  # Create tables asynchronously
+  async with engine.begin() as conn:
+    await conn.run_sync(Base.metadata.create_all)
+
+  # Seed data asynchronously
+  async with AsyncSessionLocal() as session:
     try:
-        seed_data(session)
-    finally:
-        session.close()
+      await seed_data(session)
+    except Exception as e:
+      await session.rollback()
+      print(f"Error seeding database: {e}")
 
+  _db_initialized = True
